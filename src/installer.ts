@@ -1,4 +1,6 @@
+import * as crypto from 'node:crypto'
 import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
 import * as path from 'node:path'
 import * as core from '@actions/core'
 import * as exec from '@actions/exec'
@@ -43,15 +45,17 @@ export async function installAndroidSdk(versions: Versions): Promise<void> {
       throw Error(`Unsupported platform: ${process.platform}`)
   }
   core.info(`start download cmdline-tools url: ${cmdlineToolsDownloadUrl}`)
-  const downloadedCmdlineToolsPath = await toolCache.downloadTool(
-    cmdlineToolsDownloadUrl
+  const downloadedCmdlineToolsPathWithExt = path.join(os.tmpdir(), `${crypto.randomUUID()}.zip`)
+  await toolCache.downloadTool(
+    cmdlineToolsDownloadUrl,
+    downloadedCmdlineToolsPathWithExt
   )
   core.info(
-    `success download cmdline-tools path: ${downloadedCmdlineToolsPath}`
+    `success download cmdline-tools path: ${downloadedCmdlineToolsPathWithExt}`
   )
   core.info('start extract cmdline-tools.zip')
   const extractedCmdlineToolPath = await toolCache.extractZip(
-    downloadedCmdlineToolsPath,
+    downloadedCmdlineToolsPathWithExt,
     path.join(ANDROID_SDK_ROOT, 'cmdline-tools')
   )
   core.info(
@@ -59,16 +63,9 @@ export async function installAndroidSdk(versions: Versions): Promise<void> {
   )
 
   const from = path.join(extractedCmdlineToolPath, 'cmdline-tools')
-  const to = 'latest'
+  const to = path.join(ANDROID_SDK_ROOT, 'cmdline-tools', 'latest')
   core.info(`start rename ${from} to ${to}`)
-  if (process.platform === 'win32') {
-    await exec.exec(`cmd /c "rename ${from} ${to}"`)
-  } else {
-    await fs.mkdir(path.join(ANDROID_SDK_ROOT, 'cmdline-tools', to), {
-      recursive: true
-    })
-    await fs.rename(from, path.join(ANDROID_SDK_ROOT, 'cmdline-tools', to))
-  }
+  await fs.rename(from, to)
   core.info(`success rename ${from} to ${to}`)
 
   core.info('start accept licenses')
